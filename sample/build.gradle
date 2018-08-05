@@ -1,8 +1,9 @@
 apply plugin: 'com.android.application'
+apply plugin: 'kotlin-android'
+apply plugin: 'kotlin-android-extensions'
 
 android {
     compileSdkVersion rootProject.ext.targetSdkVersion
-    buildToolsVersion rootProject.ext.buildToolsVersion
 
     defaultConfig {
         applicationId "com.example.kyrie"
@@ -10,7 +11,6 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0"
-        vectorDrawables.useSupportLibrary = true
     }
     buildTypes {
         debug {
@@ -31,6 +31,7 @@ dependencies {
     implementation "com.android.support:appcompat-v7:$supportLibVersion"
     implementation "com.android.support:support-fragment:$supportLibVersion"
     implementation "com.android.support:recyclerview-v7:$supportLibVersion"
-    implementation 'com.android.support.constraint:constraint-layout:1.0.2'
-    implementation project(':library')
+    implementation project(':kyrie')
+    implementation project(':kyrie-kotlin-dsl')
+    implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion"
 }

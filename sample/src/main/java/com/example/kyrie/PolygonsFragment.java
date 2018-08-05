@@ -1,7 +1,6 @@
 package com.example.kyrie;
 
 import android.graphics.Color;
-import android.graphics.PathMeasure;
 import android.graphics.PointF;
 import android.os.Bundle;
 import android.support.annotation.ColorInt;
@@ -20,7 +19,9 @@ import com.github.alexjlockwood.kyrie.KyrieDrawable;
 import com.github.alexjlockwood.kyrie.PathData;
 import com.github.alexjlockwood.kyrie.PathNode;
 
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 
 public class PolygonsFragment extends Fragment {
   private static final float VIEWPORT_WIDTH = 1080;
@@ -28,19 +29,19 @@ public class PolygonsFragment extends Fragment {
   private static final int DURATION = 7500;
 
   private final Polygon[] polygons = {
-    new Polygon(15, 0xffe84c65, 362f, 2),
-    new Polygon(14, 0xffe84c65, 338f, 3),
-    new Polygon(13, 0xffd554d9, 314f, 4),
-    new Polygon(12, 0xffaf6eee, 292f, 5),
-    new Polygon(11, 0xff4a4ae6, 268f, 6),
-    new Polygon(10, 0xff4294e7, 244f, 7),
-    new Polygon(9, 0xff6beeee, 220f, 8),
-    new Polygon(8, 0xff42e794, 196f, 9),
-    new Polygon(7, 0xff5ae75a, 172f, 10),
-    new Polygon(6, 0xffade76b, 148f, 11),
-    new Polygon(5, 0xffefefbb, 128f, 12),
-    new Polygon(4, 0xffe79442, 106f, 13),
-    new Polygon(3, 0xffe84c65, 90f, 14)
+      new Polygon(15, 0xffe84c65, 362f, 2),
+      new Polygon(14, 0xffe84c65, 338f, 3),
+      new Polygon(13, 0xffd554d9, 314f, 4),
+      new Polygon(12, 0xffaf6eee, 292f, 5),
+      new Polygon(11, 0xff4a4ae6, 268f, 6),
+      new Polygon(10, 0xff4294e7, 244f, 7),
+      new Polygon(9, 0xff6beeee, 220f, 8),
+      new Polygon(8, 0xff42e794, 196f, 9),
+      new Polygon(7, 0xff5ae75a, 172f, 10),
+      new Polygon(6, 0xffade76b, 148f, 11),
+      new Polygon(5, 0xffefefbb, 128f, 12),
+      new Polygon(4, 0xffe79442, 106f, 13),
+      new Polygon(3, 0xffe84c65, 90f, 14)
   };
 
   private View rootView;
@@ -54,8 +55,8 @@ public class PolygonsFragment extends Fragment {
       @Nullable ViewGroup container,
       @Nullable Bundle savedInstanceState) {
     rootView = inflater.inflate(R.layout.fragment_two_pane, container, false);
-    imageViewLaps = rootView.findViewById(R.id.image_view_pane1);
-    imageViewVortex = rootView.findViewById(R.id.image_view_pane2);
+    imageViewLaps = rootView.findViewById(R.id.imageViewPane1);
+    imageViewVortex = rootView.findViewById(R.id.imageViewPane2);
     return rootView;
   }
 
@@ -97,12 +98,10 @@ public class PolygonsFragment extends Fragment {
               .duration(DURATION);
       builder.child(
           CircleNode.builder()
-              .centerX(0)
-              .centerY(0)
-              .radius(8)
               .fillColor(Color.BLACK)
-              .translateX(pathMotion.transform(p -> p.x))
-              .translateY(pathMotion.transform(p -> p.y)));
+              .radius(8)
+              .centerX(pathMotion.transform(p -> p.x))
+              .centerY(pathMotion.transform(p -> p.y)));
     }
 
     return builder.build();
@@ -146,27 +145,44 @@ public class PolygonsFragment extends Fragment {
       this.color = color;
       this.radius = radius;
       this.laps = laps;
-      pathData = getPathData(sides, radius);
-      final PathMeasure pathMeasure = new PathMeasure();
-      pathMeasure.setPath(PathData.toPath(pathData), false);
-      this.length = pathMeasure.getLength();
+      final List<PointF> points = getPoints(sides, radius);
+      this.pathData = pointsToPathData(points);
+      this.length = pointsToLength(points);
     }
 
-    private static String getPathData(int sides, float radius) {
-      final double angle = 2 * Math.PI / sides;
-      final double startAngle = 3 * Math.PI / 2.0;
-      final StringBuilder sb = new StringBuilder();
-      final float mx = (VIEWPORT_WIDTH / 2) + (float) (radius * Math.cos(startAngle));
-      final float my = (VIEWPORT_HEIGHT / 2) + (float) (radius * Math.sin(startAngle));
-      sb.append("M ").append(mx).append(" ").append(my);
-      for (int i = 1; i < sides; i++) {
-        final float lx = (VIEWPORT_WIDTH / 2) + (float) (radius * Math.cos(startAngle + angle * i));
-        final float ly =
-            (VIEWPORT_HEIGHT / 2) + (float) (radius * Math.sin(startAngle + angle * i));
-        sb.append(" ").append(lx).append(" ").append(ly);
+    private static List<PointF> getPoints(int sides, float radius) {
+      final List<PointF> points = new ArrayList<>(sides);
+      final float angle = (float) (2 * Math.PI / sides);
+      final float startAngle = (float) (3 * Math.PI / 2);
+      for (int i = 0; i <= sides; i++) {
+        final float theta = startAngle + angle * i;
+        points.add(getPolygonPoint(radius, theta));
       }
-      sb.append(" Z");
+      return points;
+    }
+
+    private static PointF getPolygonPoint(float radius, float theta) {
+      return new PointF(
+          (VIEWPORT_WIDTH / 2) + (float) (radius * Math.cos(theta)),
+          (VIEWPORT_HEIGHT / 2) + (float) (radius * Math.sin(theta)));
+    }
+
+    private static String pointsToPathData(List<PointF> points) {
+      final StringBuilder sb = new StringBuilder("M");
+      for (PointF p : points) {
+        sb.append(" ").append(p.x).append(" ").append(p.y);
+      }
       return sb.toString();
+    }
+
+    private static float pointsToLength(List<PointF> points) {
+      float length = 0;
+      for (int i = 1, size = points.size(); i < size; i++) {
+        final PointF prev = points.get(i - 1);
+        final PointF curr = points.get(i);
+        length += Math.hypot(curr.x - prev.x, curr.y - prev.y);
+      }
+      return length;
     }
   }
 }

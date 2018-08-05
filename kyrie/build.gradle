@@ -1,0 +1,66 @@
+apply plugin: 'com.android.library'
+
+android {
+    compileSdkVersion rootProject.ext.targetSdkVersion
+
+    defaultConfig {
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode 1
+        versionName "1.0"
+    }
+}
+
+dependencies {
+    implementation "com.android.support:support-compat:$supportLibVersion"
+    compileOnly 'com.google.code.findbugs:jsr305:3.0.2'
+}
+
+ext {
+    bintrayRepo = 'maven'
+    bintrayName = 'kyrie'
+
+    publishedGroupId = 'com.github.alexjlockwood'
+    libraryName = 'Kyrie'
+    artifact = 'kyrie'
+
+    libraryDescription = 'Animated Vector Drawables on steroids'
+
+    siteUrl = 'https://github.com/alexjlockwood/kyrie'
+    gitUrl = 'https://github.com/alexjlockwood/kyrie.git'
+
+    libraryVersion = '0.1.3'
+
+    developerId = 'alexjlockwood'
+    developerName = 'Alex Lockwood'
+    developerEmail = 'alexjlockwood@gmail.com'
+
+    licenseName = 'The Apache Software License, Version 2.0'
+    licenseUrl = 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+    allLicenses = ["Apache-2.0"]
+}
+
+if (project.rootProject.file('local.properties').exists()) {
+    apply from: '../scripts/install.gradle'
+    apply from: '../scripts/bintray.gradle'
+}
+
+project.afterEvaluate {
+    android.libraryVariants.all { variant ->
+        if (variant.name == 'release') {
+            task javadocRelease(type: Javadoc) {
+                description = "Generates javadocs"
+                failOnError = false
+                destinationDir = new File(destinationDir, variant.baseName)
+                source = files(variant.javaCompiler.source)
+                classpath = files(variant.javaCompiler.classpath.files) + files(android.bootClasspath)
+                options.windowTitle("Kyrie Reference")
+                options.docTitle("Kyrie Reference")
+                options.header("Kyrie Reference")
+                options.links('http://docs.oracle.com/javase/8/docs/api')
+                options.linksOffline('https://d.android.com/reference', "${android.sdkDirectory}/docs/reference")
+                exclude '**/R.java', '**/BuildConfig.java'
+            }
+        }
+    }
+}
