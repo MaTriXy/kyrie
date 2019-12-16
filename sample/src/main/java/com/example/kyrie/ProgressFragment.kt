@@ -2,12 +2,19 @@ package com.example.kyrie
 
 import android.graphics.Color
 import android.os.Bundle
-import android.support.annotation.ColorInt
-import android.support.v4.app.Fragment
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import com.github.alexjlockwood.kyrie.*
+import androidx.core.content.ContextCompat
+import androidx.fragment.app.Fragment
+import com.github.alexjlockwood.kyrie.Animation
+import com.github.alexjlockwood.kyrie.KyrieDrawable
+import com.github.alexjlockwood.kyrie.StrokeLineCap
+import com.github.alexjlockwood.kyrie.asPath
+import com.github.alexjlockwood.kyrie.asPathInterpolator
+import com.github.alexjlockwood.kyrie.group
+import com.github.alexjlockwood.kyrie.kyrieDrawable
+import com.github.alexjlockwood.kyrie.path
 import kotlinx.android.synthetic.main.fragment_two_pane.*
 
 class ProgressFragment : Fragment() {
@@ -31,9 +38,10 @@ class ProgressFragment : Fragment() {
     }
 
     private fun createHorizontalDrawable(): KyrieDrawable {
+        val tintColor = ContextCompat.getColor(requireContext(), R.color.colorAccent)
         return kyrieDrawable {
             viewport(360f, 10f)
-            tint(TINT_COLOR)
+            tint(tintColor)
             group {
                 translateX(180f)
                 translateY(5f)
@@ -80,9 +88,10 @@ class ProgressFragment : Fragment() {
     }
 
     private fun createCircularDrawable(): KyrieDrawable {
+        val tintColor = ContextCompat.getColor(requireContext(), R.color.colorAccent)
         return kyrieDrawable {
             viewport(48f, 48f)
-            tint(TINT_COLOR)
+            tint(tintColor)
             group {
                 translateX(24f)
                 translateY(24f)
@@ -116,10 +125,5 @@ class ProgressFragment : Fragment() {
                 }
             }
         }
-    }
-
-    companion object {
-        @ColorInt
-        private val TINT_COLOR = -0xbf7f
     }
 }

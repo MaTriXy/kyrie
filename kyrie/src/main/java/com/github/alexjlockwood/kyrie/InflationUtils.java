@@ -9,19 +9,14 @@ import android.content.res.Resources.NotFoundException;
 import android.content.res.TypedArray;
 import android.content.res.XmlResourceParser;
 import android.graphics.Color;
+import android.graphics.LinearGradient;
 import android.graphics.Path;
 import android.graphics.PointF;
 import android.graphics.PorterDuff;
+import android.graphics.RadialGradient;
+import android.graphics.Shader;
+import android.graphics.SweepGradient;
 import android.os.Build;
-import android.support.annotation.AnimRes;
-import android.support.annotation.AnimatorRes;
-import android.support.annotation.DrawableRes;
-import android.support.annotation.IntDef;
-import android.support.annotation.InterpolatorRes;
-import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
-import android.support.v4.util.ArrayMap;
-import android.support.v4.view.animation.PathInterpolatorCompat;
 import android.util.AttributeSet;
 import android.util.TypedValue;
 import android.util.Xml;
@@ -36,6 +31,16 @@ import android.view.animation.CycleInterpolator;
 import android.view.animation.DecelerateInterpolator;
 import android.view.animation.LinearInterpolator;
 import android.view.animation.OvershootInterpolator;
+
+import androidx.annotation.AnimRes;
+import androidx.annotation.AnimatorRes;
+import androidx.annotation.DrawableRes;
+import androidx.annotation.IntDef;
+import androidx.annotation.InterpolatorRes;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.collection.ArrayMap;
+import androidx.core.view.animation.PathInterpolatorCompat;
 
 import com.github.alexjlockwood.kyrie.Animation.RepeatMode;
 
@@ -109,7 +114,8 @@ final class InflationUtils {
         final String tagName = parser.getName();
         if (TAG_ANIMATED_VECTOR.equals(tagName)) {
           final TypedArray a =
-              TypedArrayUtils.obtainAttributes(context, attrs, Styleable.ANIMATED_VECTOR);
+              TypedArrayUtils.obtainAttributes(
+                  context.getResources(), context.getTheme(), attrs, Styleable.ANIMATED_VECTOR);
           drawableResId = a.getResourceId(Styleable.AnimatedVector.DRAWABLE, 0);
           a.recycle();
         } else if (TAG_TARGET.equals(tagName)) {
@@ -167,7 +173,9 @@ final class InflationUtils {
       AttributeSet attrs,
       @Nullable Map<String, Map<String, Animation[]>> targetMap)
       throws XmlPullParserException, IOException {
-    final TypedArray a = TypedArrayUtils.obtainAttributes(context, attrs, Styleable.VECTOR);
+    final TypedArray a =
+        TypedArrayUtils.obtainAttributes(
+            context.getResources(), context.getTheme(), attrs, Styleable.VECTOR);
     Map<String, Animation[]> animationMap = null;
     if (targetMap != null) {
       final String groupName = a.getString(Styleable.Vector.NAME);
@@ -175,7 +183,7 @@ final class InflationUtils {
         animationMap = targetMap.get(groupName);
       }
     }
-    updateVectorFromTypedArray(builder, a, parser, animationMap);
+    updateVectorFromTypedArray(builder, context, a, parser, animationMap);
     a.recycle();
 
     // Use a stack to help to build the group tree. The top is always the current group.
@@ -226,10 +234,12 @@ final class InflationUtils {
 
   private static void updateVectorFromTypedArray(
       KyrieDrawable.Builder builder,
+      Context context,
       TypedArray a,
       XmlPullParser parser,
       @Nullable Map<String, Animation[]> animationMap) {
-    builder.tintList(a.getColorStateList(Styleable.Vector.TINT));
+    builder.tintList(
+        TypedArrayUtils.getNamedColorStateList(a, parser, context, "tint", Styleable.Vector.TINT));
     final int tintMode =
         TypedArrayUtils.getNamedInt(a, parser, "tintMode", Styleable.Vector.TINT_MODE, -1);
     builder.tintMode(parseTintMode(tintMode, PorterDuff.Mode.SRC_IN));
@@ -276,7 +286,9 @@ final class InflationUtils {
       XmlPullParser parser,
       AttributeSet attrs,
       @Nullable Map<String, Map<String, Animation[]>> targetMap) {
-    final TypedArray a = TypedArrayUtils.obtainAttributes(context, attrs, Styleable.GROUP);
+    final TypedArray a =
+        TypedArrayUtils.obtainAttributes(
+            context.getResources(), context.getTheme(), attrs, Styleable.GROUP);
     Map<String, Animation[]> animationMap = null;
     if (targetMap != null) {
       final String groupName = a.getString(Styleable.Group.NAME);
@@ -332,7 +344,9 @@ final class InflationUtils {
       XmlPullParser parser,
       AttributeSet attrs,
       @Nullable Map<String, Map<String, Animation[]>> targetMap) {
-    final TypedArray a = TypedArrayUtils.obtainAttributes(context, attrs, Styleable.PATH);
+    final TypedArray a =
+        TypedArrayUtils.obtainAttributes(
+            context.getResources(), context.getTheme(), attrs, Styleable.PATH);
     Map<String, Animation[]> animationMap = null;
     if (targetMap != null) {
       final String pathName = a.getString(Styleable.Path.NAME);
@@ -340,7 +354,7 @@ final class InflationUtils {
         animationMap = targetMap.get(pathName);
       }
     }
-    updatePathFromTypedArray(builder, a, parser, animationMap);
+    updatePathFromTypedArray(builder, a, parser, context, animationMap);
     a.recycle();
   }
 
@@ -349,6 +363,7 @@ final class InflationUtils {
       PathNode.Builder builder,
       TypedArray a,
       XmlPullParser parser,
+      Context context,
       @Nullable Map<String, Animation[]> animationMap) {
     final boolean hasPathData = TypedArrayUtils.hasAttribute(parser, "pathData");
     if (!hasPathData) {
@@ -361,23 +376,67 @@ final class InflationUtils {
         builder.pathData((Animation<?, PathData>[]) animationMap.get("pathData"));
       }
     }
-    builder.fillColor(
-        TypedArrayUtils.getNamedColor(
-            a, parser, "fillColor", Styleable.Path.FILL_COLOR, Color.TRANSPARENT));
-    if (animationMap != null && animationMap.containsKey("fillColor")) {
-      builder.fillColor((Animation<?, Integer>[]) animationMap.get("fillColor"));
+
+    final ComplexColor fillColorComplex =
+        TypedArrayUtils.getNamedComplexColor(
+            a, parser, context, "fillColor", Styleable.Path.FILL_COLOR, Color.TRANSPARENT);
+    if (fillColorComplex.isGradient()) {
+      final Shader shader = fillColorComplex.getShader();
+      if (shader instanceof LinearGradient) {
+        builder.fillColor((LinearGradient) shader);
+      } else if (shader instanceof RadialGradient) {
+        builder.fillColor((RadialGradient) shader);
+      } else if (shader instanceof SweepGradient) {
+        builder.fillColor((SweepGradient) shader);
+      } else {
+        throw new IllegalStateException("Unsupported shader type");
+      }
+    } else {
+      if (animationMap != null && animationMap.containsKey("fillColor")) {
+        builder.fillColor(fillColorComplex.getColor());
+        builder.fillColor((Animation<?, Integer>[]) animationMap.get("fillColor"));
+      } else {
+        if (fillColorComplex.isStateful()) {
+          builder.fillColor(fillColorComplex.getColorStateList());
+        } else {
+          builder.fillColor(fillColorComplex.getColor());
+        }
+      }
     }
+
     builder.fillAlpha(
         TypedArrayUtils.getNamedFloat(a, parser, "fillAlpha", Styleable.Path.FILL_ALPHA, 1));
     if (animationMap != null && animationMap.containsKey("fillAlpha")) {
       builder.fillAlpha((Animation<?, Float>[]) animationMap.get("fillAlpha"));
     }
-    builder.strokeColor(
-        TypedArrayUtils.getNamedColor(
-            a, parser, "strokeColor", Styleable.Path.STROKE_COLOR, Color.TRANSPARENT));
-    if (animationMap != null && animationMap.containsKey("strokeColor")) {
-      builder.strokeColor((Animation<?, Integer>[]) animationMap.get("strokeColor"));
+
+    final ComplexColor strokeColorComplex =
+        TypedArrayUtils.getNamedComplexColor(
+            a, parser, context, "strokeColor", Styleable.Path.STROKE_COLOR, Color.TRANSPARENT);
+    if (strokeColorComplex.isGradient()) {
+      final Shader shader = strokeColorComplex.getShader();
+      if (shader instanceof LinearGradient) {
+        builder.strokeColor((LinearGradient) shader);
+      } else if (shader instanceof RadialGradient) {
+        builder.strokeColor((RadialGradient) shader);
+      } else if (shader instanceof SweepGradient) {
+        builder.strokeColor((SweepGradient) shader);
+      } else {
+        throw new IllegalStateException("Unsupported shader type");
+      }
+    } else {
+      if (animationMap != null && animationMap.containsKey("strokeColor")) {
+        builder.strokeColor(strokeColorComplex.getColor());
+        builder.strokeColor((Animation<?, Integer>[]) animationMap.get("strokeColor"));
+      } else {
+        if (strokeColorComplex.isStateful()) {
+          builder.strokeColor(strokeColorComplex.getColorStateList());
+        } else {
+          builder.strokeColor(strokeColorComplex.getColor());
+        }
+      }
     }
+
     builder.strokeAlpha(
         TypedArrayUtils.getNamedFloat(a, parser, "strokeAlpha", Styleable.Path.STROKE_ALPHA, 1));
     if (animationMap != null && animationMap.containsKey("strokeAlpha")) {
@@ -405,27 +464,22 @@ final class InflationUtils {
     if (animationMap != null && animationMap.containsKey("trimPathOffset")) {
       builder.trimPathOffset((Animation<?, Float>[]) animationMap.get("trimPathOffset"));
     }
-    @StrokeLineCap
     final int lineCap =
-        TypedArrayUtils.getNamedInt(
-            a, parser, "strokeLineCap", Styleable.Path.STROKE_LINE_CAP, StrokeLineCap.BUTT);
-    builder.strokeLineCap(lineCap);
-    @StrokeLineJoin
+        TypedArrayUtils.getNamedInt(a, parser, "strokeLineCap", Styleable.Path.STROKE_LINE_CAP, 0);
+    builder.strokeLineCap(StrokeLineCap.values()[lineCap]);
     final int lineJoin =
         TypedArrayUtils.getNamedInt(
-            a, parser, "strokeLineJoin", Styleable.Path.STROKE_LINE_JOIN, StrokeLineJoin.MITER);
-    builder.strokeLineJoin(lineJoin);
+            a, parser, "strokeLineJoin", Styleable.Path.STROKE_LINE_JOIN, 0);
+    builder.strokeLineJoin(StrokeLineJoin.values()[lineJoin]);
     builder.strokeMiterLimit(
         TypedArrayUtils.getNamedFloat(
             a, parser, "strokeMiterLimit", Styleable.Path.STROKE_MITER_LIMIT, 4));
     if (animationMap != null && animationMap.containsKey("strokeMiterLimit")) {
       builder.strokeMiterLimit((Animation<?, Float>[]) animationMap.get("strokeMiterLimit"));
     }
-    @FillType
     final int fillType =
-        TypedArrayUtils.getNamedInt(
-            a, parser, "fillType", Styleable.Path.FILL_TYPE, FillType.NON_ZERO);
-    builder.fillType(fillType);
+        TypedArrayUtils.getNamedInt(a, parser, "fillType", Styleable.Path.FILL_TYPE, 0);
+    builder.fillType(FillType.values()[fillType]);
   }
 
   private static void inflateClipPath(
@@ -434,7 +488,9 @@ final class InflationUtils {
       XmlPullParser parser,
       AttributeSet attrs,
       @Nullable Map<String, Map<String, Animation[]>> targetMap) {
-    final TypedArray a = TypedArrayUtils.obtainAttributes(context, attrs, Styleable.CLIP_PATH);
+    final TypedArray a =
+        TypedArrayUtils.obtainAttributes(
+            context.getResources(), context.getTheme(), attrs, Styleable.CLIP_PATH);
     Map<String, Animation[]> animationMap = null;
     if (targetMap != null) {
       final String pathName = a.getString(Styleable.ClipPath.NAME);
@@ -463,6 +519,10 @@ final class InflationUtils {
         builder.pathData((Animation<?, PathData>[]) animationMap.get("pathData"));
       }
     }
+
+    final int fillType =
+        TypedArrayUtils.getNamedInt(a, parser, "fillType", Styleable.ClipPath.FILL_TYPE, 0);
+    builder.fillType(FillType.values()[fillType]);
   }
 
   // </editor-fold>
@@ -506,7 +566,6 @@ final class InflationUtils {
     } catch (XmlPullParserException | IOException ex) {
       final NotFoundException rnf =
           new NotFoundException("Can't load animation resource ID #0x" + Integer.toHexString(id));
-      //noinspection UnnecessaryInitCause
       rnf.initCause(ex);
       throw rnf;
     } finally {
@@ -545,7 +604,8 @@ final class InflationUtils {
       } else if (name.equals("set")) {
         anim = new MyAnimatorSet();
         final TypedArray a =
-            TypedArrayUtils.obtainAttributes(context, attrs, Styleable.ANIMATOR_SET);
+            TypedArrayUtils.obtainAttributes(
+                context.getResources(), context.getTheme(), attrs, Styleable.ANIMATOR_SET);
         final int ordering =
             TypedArrayUtils.getNamedInt(
                 a, parser, "ordering", Styleable.AnimatorSet.ORDERING, ORDERING_TOGETHER);
@@ -590,9 +650,11 @@ final class InflationUtils {
       Context context, AttributeSet attrs, XmlPullParser parser) throws NotFoundException {
     final MyObjectAnimator anim = new MyObjectAnimator();
     final TypedArray arrayAnimator =
-        TypedArrayUtils.obtainAttributes(context, attrs, Styleable.ANIMATOR);
+        TypedArrayUtils.obtainAttributes(
+            context.getResources(), context.getTheme(), attrs, Styleable.ANIMATOR);
     final TypedArray arrayObjectAnimator =
-        TypedArrayUtils.obtainAttributes(context, attrs, Styleable.PROPERTY_ANIMATOR);
+        TypedArrayUtils.obtainAttributes(
+            context.getResources(), context.getTheme(), attrs, Styleable.PROPERTY_ANIMATOR);
     parseAnimatorFromTypeArray(anim, arrayAnimator, arrayObjectAnimator, parser);
     final int resId =
         TypedArrayUtils.getNamedResourceId(
@@ -658,7 +720,17 @@ final class InflationUtils {
     anim.setDuration(duration);
     anim.setStartDelay(startDelay);
     anim.setRepeatCount(arrayAnimator.getInt(Styleable.Animator.REPEAT_COUNT, 0));
-    anim.setRepeatMode(arrayAnimator.getInt(Styleable.Animator.REPEAT_MODE, ValueAnimator.RESTART));
+    final int repeatModeInt =
+        arrayAnimator.getInt(Styleable.Animator.REPEAT_MODE, ValueAnimator.RESTART);
+    final RepeatMode repeatMode;
+    if (repeatModeInt == ValueAnimator.RESTART) {
+      repeatMode = RepeatMode.RESTART;
+    } else if (repeatModeInt == ValueAnimator.REVERSE) {
+      repeatMode = RepeatMode.REVERSE;
+    } else {
+      throw new InflateException("Invalid repeatMode: " + repeatModeInt);
+    }
+    anim.setRepeatMode(repeatMode);
 
     // Setup the object animator.
     final String pathData =
@@ -734,7 +806,11 @@ final class InflationUtils {
 
       if (name.equals("propertyValuesHolder")) {
         final TypedArray a =
-            TypedArrayUtils.obtainAttributes(context, attrs, Styleable.PROPERTY_VALUES_HOLDER);
+            TypedArrayUtils.obtainAttributes(
+                context.getResources(),
+                context.getTheme(),
+                attrs,
+                Styleable.PROPERTY_VALUES_HOLDER);
         final String propertyName =
             TypedArrayUtils.getNamedString(
                 a, parser, "propertyName", Styleable.PropertyValuesHolder.PROPERTY_NAME);
@@ -872,7 +948,9 @@ final class InflationUtils {
   private static int inferValueTypeOfKeyframe(
       Context context, AttributeSet attrs, XmlPullParser parser) {
     @ValueType int valueType;
-    final TypedArray a = TypedArrayUtils.obtainAttributes(context, attrs, Styleable.KEYFRAME);
+    final TypedArray a =
+        TypedArrayUtils.obtainAttributes(
+            context.getResources(), context.getTheme(), attrs, Styleable.KEYFRAME);
     final TypedValue keyframeValue =
         TypedArrayUtils.peekNamedValue(a, parser, "value", Styleable.Keyframe.VALUE);
     final boolean hasValue = keyframeValue != null;
@@ -913,8 +991,8 @@ final class InflationUtils {
     if (valueType == VALUE_TYPE_PATH) {
       final String fromString = styledAttributes.getString(valueFromId);
       final String toString = styledAttributes.getString(valueToId);
-      final PathData nodesFrom = PathData.parse(fromString);
-      final PathData nodesTo = PathData.parse(toString);
+      final PathData nodesFrom = PathData.parse(fromString == null ? "" : fromString);
+      final PathData nodesTo = PathData.parse(toString == null ? "" : toString);
       if (!nodesFrom.canMorphWith(nodesTo)) {
         throw new InflateException("Can't morph from " + fromString + " to " + toString);
       }
@@ -1012,9 +1090,10 @@ final class InflationUtils {
   }
 
   private static Keyframe loadKeyframe(
-      Context context, AttributeSet attrs, @ValueType int valueType, XmlPullParser parser)
-      throws XmlPullParserException, IOException {
-    final TypedArray a = TypedArrayUtils.obtainAttributes(context, attrs, Styleable.KEYFRAME);
+      Context context, AttributeSet attrs, @ValueType int valueType, XmlPullParser parser) {
+    final TypedArray a =
+        TypedArrayUtils.obtainAttributes(
+            context.getResources(), context.getTheme(), attrs, Styleable.KEYFRAME);
     float fraction =
         TypedArrayUtils.getNamedFloat(a, parser, "fraction", Styleable.Keyframe.FRACTION, -1);
 
@@ -1038,13 +1117,13 @@ final class InflationUtils {
         case VALUE_TYPE_FLOAT:
           float value =
               TypedArrayUtils.getNamedFloat(a, parser, "value", Styleable.Keyframe.VALUE, 0);
-          keyframe = Keyframe.of(fraction, value);
+          keyframe = Keyframe.<Float>of(fraction, value);
           break;
         case VALUE_TYPE_COLOR:
         case VALUE_TYPE_INT:
           int intValue =
               TypedArrayUtils.getNamedInt(a, parser, "value", Styleable.Keyframe.VALUE, 0);
-          keyframe = Keyframe.of(fraction, intValue);
+          keyframe = Keyframe.<Integer>of(fraction, intValue);
           break;
       }
     } else {
@@ -1076,12 +1155,12 @@ final class InflationUtils {
     private MyAnimator[] animators = {};
     private boolean isOrderingSequential = true;
 
-    public void playTogether(MyAnimator[] animators) {
+    void playTogether(MyAnimator[] animators) {
       this.animators = animators;
       isOrderingSequential = false;
     }
 
-    public void playSequentially(MyAnimator[] animators) {
+    void playSequentially(MyAnimator[] animators) {
       this.animators = animators;
       isOrderingSequential = true;
     }
@@ -1117,8 +1196,8 @@ final class InflationUtils {
   private static class MyObjectAnimator extends MyAnimator {
     private long startDelay;
     private long duration;
-    @RepeatMode private int repeatMode;
-    private int repeatCount;
+    private RepeatMode repeatMode;
+    private long repeatCount;
     @Nullable private TimeInterpolator interpolator;
     private MyPropertyValuesHolder[] values = {};
 
@@ -1138,19 +1217,19 @@ final class InflationUtils {
       return duration;
     }
 
-    public void setRepeatCount(int repeatCount) {
+    public void setRepeatCount(long repeatCount) {
       this.repeatCount = repeatCount;
     }
 
-    public int getRepeatCount() {
+    public long getRepeatCount() {
       return repeatCount;
     }
 
-    public void setRepeatMode(@RepeatMode int repeatMode) {
+    public void setRepeatMode(RepeatMode repeatMode) {
       this.repeatMode = repeatMode;
     }
 
-    public int getRepeatMode() {
+    public RepeatMode getRepeatMode() {
       return repeatMode;
     }
 
@@ -1191,8 +1270,8 @@ final class InflationUtils {
         long startTime,
         long endTime,
         TimeInterpolator interpolator,
-        int repeatCount,
-        @RepeatMode int repeatMode);
+        long repeatCount,
+        RepeatMode repeatMode);
   }
 
   private static class MySimplePropertyValuesHolder extends MyPropertyValuesHolder {
@@ -1201,7 +1280,7 @@ final class InflationUtils {
     @NonNull private final Object toValue;
     @ValueType private final int valueType;
 
-    public MySimplePropertyValuesHolder(
+    MySimplePropertyValuesHolder(
         String propertyName, @Nullable Object fromValue, Object toValue, @ValueType int valueType) {
       this.propertyName = propertyName;
       this.fromValue = fromValue;
@@ -1215,8 +1294,8 @@ final class InflationUtils {
         long startTime,
         long endTime,
         @Nullable TimeInterpolator interpolator,
-        int repeatCount,
-        @RepeatMode int repeatMode) {
+        long repeatCount,
+        RepeatMode repeatMode) {
       Animation<?, ?> anim;
       switch (valueType) {
         case VALUE_TYPE_FLOAT:
@@ -1242,7 +1321,6 @@ final class InflationUtils {
           } else {
             anim = Animation.ofPathMorph((PathData) fromValue, (PathData) toValue);
           }
-
           break;
         default:
           throw new IllegalStateException("Invalid value type: " + valueType);
@@ -1268,7 +1346,7 @@ final class InflationUtils {
     @Nullable private final String propertyNameX;
     @Nullable private final String propertyNameY;
 
-    public MyPathMotionPropertyValuesHolder(
+    MyPathMotionPropertyValuesHolder(
         Path path, @Nullable String propertyNameX, @Nullable String propertyNameY) {
       this.path = path;
       this.propertyNameX = propertyNameX;
@@ -1281,8 +1359,8 @@ final class InflationUtils {
         long startTime,
         long endTime,
         @Nullable TimeInterpolator interpolator,
-        int repeatCount,
-        @RepeatMode int repeatMode) {
+        long repeatCount,
+        RepeatMode repeatMode) {
       final Map<String, List<Animation<?, ?>>> map = new ArrayMap<>();
       if (interpolator == null) {
         interpolator = new AccelerateDecelerateInterpolator();
@@ -1342,8 +1420,8 @@ final class InflationUtils {
         long startTime,
         long endTime,
         @Nullable TimeInterpolator interpolator,
-        int repeatCount,
-        @RepeatMode int repeatMode) {
+        long repeatCount,
+        RepeatMode repeatMode) {
       final Map<String, List<Animation<?, ?>>> map = new ArrayMap<>();
       Animation<?, ?> anim;
       switch (valueType) {
@@ -1426,7 +1504,6 @@ final class InflationUtils {
     } catch (XmlPullParserException | IOException e) {
       final NotFoundException rnf =
           new NotFoundException("Can't load animation resource ID #0x" + Integer.toHexString(id));
-      //noinspection UnnecessaryInitCause
       rnf.initCause(e);
       throw rnf;
     } finally {
@@ -1488,7 +1565,8 @@ final class InflationUtils {
   private static TimeInterpolator inflatePathInterpolator(
       Context context, AttributeSet attrs, XmlPullParser parser) {
     final TypedArray a =
-        TypedArrayUtils.obtainAttributes(context, attrs, Styleable.PATH_INTERPOLATOR);
+        TypedArrayUtils.obtainAttributes(
+            context.getResources(), context.getTheme(), attrs, Styleable.PATH_INTERPOLATOR);
     final TimeInterpolator interpolator = parseInterpolatorFromTypeArray(a, parser);
     a.recycle();
     return interpolator;
@@ -1501,7 +1579,7 @@ final class InflationUtils {
       final String pathData =
           TypedArrayUtils.getNamedString(
               a, parser, "pathData", Styleable.PathInterpolator.PATH_DATA);
-      final Path path = PathData.toPath(pathData);
+      final Path path = PathData.toPath(pathData == null ? "" : pathData);
       if (path.isEmpty()) {
         throw new InflateException("The path cannot be empty");
       }

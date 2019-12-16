@@ -1,11 +1,10 @@
 @javax.annotation.ParametersAreNonnullByDefault
 package com.github.alexjlockwood.kyrie;
 
-// TODO: support gradients and/or animatable gradients?
+// TODO: support animatable gradients?
 // TODO: support text layers?
 // TODO: support image layers?
 // TODO: avoid using canvas.clipPath (no anti-alias support)?
-// TODO: support color state lists for pathData fill/stroke colors
 // TODO: don't bother starting the animator if there are no keyframes
 // TODO: allow clients to pass in string paths to keyframes (instead of PathData objects)
 // TODO: possibly change PathMorphKeyframeAnimation to take strings instead of PathData objects
@@ -44,3 +43,4 @@ package com.github.alexjlockwood.kyrie;
 // TODO: should we use "startOffset" or "startDelay" as terminology? AVD object animators use startOffset
 // TODO: should we use linear or accelerate/decelerate as the default interpolator
 // TODO: publish sample app on play store?
+// TODO: support gradients w/ color state lists?

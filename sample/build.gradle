@@ -11,6 +11,7 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0"
+        vectorDrawables.useSupportLibrary = true
     }
     buildTypes {
         debug {
@@ -28,10 +29,9 @@ android {
 }
 
 dependencies {
-    implementation "com.android.support:appcompat-v7:$supportLibVersion"
-    implementation "com.android.support:support-fragment:$supportLibVersion"
-    implementation "com.android.support:recyclerview-v7:$supportLibVersion"
     implementation project(':kyrie')
-    implementation project(':kyrie-kotlin-dsl')
+    implementation 'androidx.appcompat:appcompat:1.1.0-alpha05'
+    implementation 'androidx.fragment:fragment:1.1.0-alpha09'
+    implementation 'androidx.recyclerview:recyclerview:1.0.0'
     implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion"
 }
